@@ -7,7 +7,7 @@ from jsonschema import validate, ValidationError, FormatChecker
 from .default_validator import ExtendedDefaultValidator
 
 
-def expects_json(schema=None, force=False, fill_defaults=False, ignore_for=None, check_formats=False):
+def expects_json(schema=None, force=False, fill_defaults=False, ignore_for=None, check_formats=False, parameter=None):
     if schema is None:
         schema = dict()
     if ignore_for is not None:
@@ -20,7 +20,11 @@ def expects_json(schema=None, force=False, fill_defaults=False, ignore_for=None,
             if ignore_for is not None and request.method in ignore_for:
                 return f(*args, **kwargs)
 
-            data = request.get_json(force=force)
+            if parameter:
+                data = request.args.get(parameter)
+            
+            else:
+                data = request.get_json(force=force)
 
             if data is None:
                 return abort(400, 'Failed to decode JSON object')
@@ -40,6 +44,41 @@ def expects_json(schema=None, force=False, fill_defaults=False, ignore_for=None,
                     ExtendedDefaultValidator(schema, format_checker=format_checker).validate(data)
                 else:
                     validate(data, schema, format_checker=format_checker)
+            except ValidationError as e:
+                return abort(400, e)
+
+            g.data = data
+
+            if hasattr(current_app, "ensure_sync"):
+                return current_app.ensure_sync(f)(*args, **kwargs)
+            else:
+                return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+def expects_parameter(schema=None, ignore_for=None, name=None, required=False):
+    if schema is None:
+        schema = dict()
+    if ignore_for is not None:
+        if isinstance(ignore_for, str):
+            raise TypeError('Methods should be wrapped in an iterable. i.e. ignore_for=["GET"]')
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if ignore_for is not None and request.method in ignore_for:
+                return f(*args, **kwargs)
+
+            data = request.args.get(name)
+
+            if data is None:
+                if required:
+                    return abort(400, 'Failed to receive parameter')
+                else:
+                    return f(*args, **kwargs)
+
+            try:
+                validate(data, schema, format_checker=FormatChecker())
             except ValidationError as e:
                 return abort(400, e)
 
