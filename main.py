@@ -17,12 +17,12 @@ if __name__ == "__main__":
 
     parameter_name_schema = {
         "type": "string",
-        "enum": ["Barak","Omri"]
+        "enum": ["chen","shon"]
     }
 
     parameter_last_schema = {
         "type": "string",
-        "enum": ["Rozenkvit","Levi"]
+        "enum": ["llali","chmud"]
     }
 
     @app.route('/schema')
